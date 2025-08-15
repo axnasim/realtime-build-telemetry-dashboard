@@ -1,0 +1,3 @@
+{"agent_id":"agent-1","build_id":"b-1","status":"PASS","duration_ms":12000}
+{"agent_id":"agent-2","build_id":"b-2","status":"FAIL","duration_ms":35000}
+{"agent_id":"agent-3","build_id":"b-3","status":"PASS","duration_ms":18000}

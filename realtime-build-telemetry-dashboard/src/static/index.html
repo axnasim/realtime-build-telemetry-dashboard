@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Realtime Build Telemetry Dashboard</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .stat { font-size: 28px; font-weight: 700; }
+    .label { color: #666; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+    canvas { max-width: 100%; }
+    @media (max-width: 900px){ .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>Realtime Build Telemetry Dashboard</h1>
+  <div class="grid">
+    <div class="card">
+      <div class="label">Total Builds</div>
+      <div id="total" class="stat">0</div>
+    </div>
+    <div class="card">
+      <div class="label">Passed</div>
+      <div id="passed" class="stat">0</div>
+    </div>
+    <div class="card">
+      <div class="label">Failed</div>
+      <div id="failed" class="stat">0</div>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:16px;">
+    <div class="card" style="grid-column: span 2;">
+      <canvas id="passFailChart"></canvas>
+    </div>
+    <div class="card">
+      <div class="label">Avg Duration (ms)</div>
+      <div id="avg" class="stat">0</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const totalEl = document.getElementById('total');
+    const passedEl = document.getElementById('passed');
+    const failedEl = document.getElementById('failed');
+    const avgEl = document.getElementById('avg');
+
+    const ctx = document.getElementById('passFailChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Passed', 'Failed'],
+        datasets: [{
+          label: 'Builds',
+          data: [0,0]
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+
+    function updateUI(summary){
+      totalEl.textContent = summary.total;
+      passedEl.textContent = summary.passed;
+      failedEl.textContent = summary.failed;
+      avgEl.textContent = Math.round(summary.avg_duration_ms);
+      chart.data.datasets[0].data = [summary.passed, summary.failed];
+      chart.update();
+    }
+
+    // Initial fetch in case WS is delayed
+    fetch('/summary').then(r => r.json()).then(updateUI).catch(()=>{});
+
+    const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(wsProto + '://' + location.host + '/ws');
+    ws.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        if(msg.type === 'summary'){
+          updateUI(msg.data);
+        }
+      } catch(e){}
+    };
+  </script>
+</body>
+</html>
