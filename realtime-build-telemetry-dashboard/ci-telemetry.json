@@ -1,0 +1,35 @@
+{
+  "dashboard": {
+    "title": "CI/CD Build Telemetry",
+    "panels": [
+      {
+        "title": "Build Success Rate (24h)",
+        "targets": [{
+          "expr": "rate(build_count{status=\"PASS\"}[24h]) / rate(build_count[24h])"
+        }],
+        "type": "stat"
+      },
+      {
+        "title": "Flaky Tests Detected",
+        "targets": [{
+          "expr": "sum(build_flaky_tests)"
+        }],
+        "type": "stat"
+      },
+      {
+        "title": "Build Duration P95",
+        "targets": [{
+          "expr": "histogram_quantile(0.95, build_duration_bucket)"
+        }],
+        "type": "graph"
+      },
+      {
+        "title": "Builds by Agent",
+        "targets": [{
+          "expr": "sum(build_count) by (agent_id)"
+        }],
+        "type": "piechart"
+      }
+    ]
+  }
+}

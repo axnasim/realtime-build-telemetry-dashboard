@@ -1,18 +1,11 @@
 from pydantic import BaseModel, Field
-from typing import Literal, Optional
-import time
+from typing import Optional
+from datetime import datetime
 
-Status = Literal["PASS", "FAIL"]
-
-class BuildEvent(BaseModel):
-    agent_id: str = Field(..., min_length=1)
-    build_id: str = Field(..., min_length=1)
-    status: Status
-    duration_ms: int = Field(..., ge=0)
-    timestamp: float = Field(default_factory=lambda: time.time())
-
-class Summary(BaseModel):
-    total: int
-    passed: int
-    failed: int
-    avg_duration_ms: float
+class BuildMetric(BaseModel):
+    agent_id: str = Field(..., description="CI agent identifier")
+    build_id: str = Field(..., description="Unique build identifier")
+    status: str = Field(..., description="Build status: PASS or FAIL")
+    duration_ms: int = Field(..., description="Build duration in milliseconds")
+    timestamp: Optional[datetime] = None
+    metadata: Optional[dict] = None

@@ -1,91 +1,299 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Realtime Build Telemetry Dashboard</title>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 20px; }
-    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-    .stat { font-size: 28px; font-weight: 700; }
-    .label { color: #666; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
-    canvas { max-width: 100%; }
-    @media (max-width: 900px){ .grid { grid-template-columns: 1fr; } }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Build Telemetry Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+        .stat-label {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .stat-value.success { color: #10b981; }
+        .stat-value.failure { color: #ef4444; }
+        .stat-value.warning { color: #f59e0b; }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .chart-card {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+        .chart-title {
+            font-size: 1.125rem;
+            margin-bottom: 15px;
+            color: #f1f5f9;
+        }
+        .flaky-tests {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+        .flaky-test-item {
+            padding: 12px;
+            background: #0f172a;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #f59e0b;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-indicator.online { background: #10b981; }
+        .status-indicator.offline { background: #ef4444; }
+    </style>
 </head>
 <body>
-  <h1>Realtime Build Telemetry Dashboard</h1>
-  <div class="grid">
-    <div class="card">
-      <div class="label">Total Builds</div>
-      <div id="total" class="stat">0</div>
+    <div class="container">
+        <h1>🚀 Real-time Build Telemetry Dashboard</h1>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Builds</div>
+                <div class="stat-value" id="total-builds">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Success Rate</div>
+                <div class="stat-value success" id="success-rate">0%</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Flaky Tests</div>
+                <div class="stat-value warning" id="flaky-count">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Duration</div>
+                <div class="stat-value" id="avg-duration">0ms</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">WebSocket Status</div>
+                <div>
+                    <span class="status-indicator" id="ws-status"></span>
+                    <span id="ws-text">Connecting...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <div class="chart-title">Build Status Distribution</div>
+                <canvas id="statusChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">Build Duration Over Time</div>
+                <canvas id="durationChart"></canvas>
+            </div>
+        </div>
+
+        <div class="flaky-tests">
+            <div class="chart-title">⚠️ Flaky Tests Detected</div>
+            <div id="flaky-tests-list">
+                <p style="color: #64748b;">No flaky tests detected yet...</p>
+            </div>
+        </div>
     </div>
-    <div class="card">
-      <div class="label">Passed</div>
-      <div id="passed" class="stat">0</div>
-    </div>
-    <div class="card">
-      <div class="label">Failed</div>
-      <div id="failed" class="stat">0</div>
-    </div>
-  </div>
 
-  <div class="grid" style="margin-top:16px;">
-    <div class="card" style="grid-column: span 2;">
-      <canvas id="passFailChart"></canvas>
-    </div>
-    <div class="card">
-      <div class="label">Avg Duration (ms)</div>
-      <div id="avg" class="stat">0</div>
-    </div>
-  </div>
+    <script>
+        // WebSocket connection
+        const ws = new WebSocket(`ws://${window.location.host}/ws`);
+        
+        ws.onopen = () => {
+            document.getElementById('ws-status').className = 'status-indicator online';
+            document.getElementById('ws-text').textContent = 'Connected';
+            console.log('WebSocket connected');
+        };
+        
+        ws.onclose = () => {
+            document.getElementById('ws-status').className = 'status-indicator offline';
+            document.getElementById('ws-text').textContent = 'Disconnected';
+            console.log('WebSocket disconnected');
+        };
+        
+        ws.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            console.log('Received:', message);
+            
+            if (message.type === 'new_metric') {
+                updateCharts(message.data);
+            } else if (message.type === 'flaky_test_detected') {
+                addFlakyTest(message.data);
+            }
+        };
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script>
-    const totalEl = document.getElementById('total');
-    const passedEl = document.getElementById('passed');
-    const failedEl = document.getElementById('failed');
-    const avgEl = document.getElementById('avg');
+        // Initialize charts
+        const statusCtx = document.getElementById('statusChart').getContext('2d');
+        const statusChart = new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Pass', 'Fail'],
+                datasets: [{
+                    data: [0, 0],
+                    backgroundColor: ['#10b981', '#ef4444']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { labels: { color: '#e2e8f0' } }
+                }
+            }
+        });
 
-    const ctx = document.getElementById('passFailChart').getContext('2d');
-    const chart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: ['Passed', 'Failed'],
-        datasets: [{
-          label: 'Builds',
-          data: [0,0]
-        }]
-      },
-      options: {
-        responsive: true,
-        scales: { y: { beginAtZero: true } }
-      }
-    });
+        const durationCtx = document.getElementById('durationChart').getContext('2d');
+        const durationChart = new Chart(durationCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Duration (ms)',
+                    data: [],
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: '#334155' }
+                    },
+                    x: {
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: '#334155' }
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: '#e2e8f0' } }
+                }
+            }
+        });
 
-    function updateUI(summary){
-      totalEl.textContent = summary.total;
-      passedEl.textContent = summary.passed;
-      failedEl.textContent = summary.failed;
-      avgEl.textContent = Math.round(summary.avg_duration_ms);
-      chart.data.datasets[0].data = [summary.passed, summary.failed];
-      chart.update();
-    }
+        let buildCount = { pass: 0, fail: 0 };
+        let totalDuration = 0;
+        let buildNumber = 0;
 
-    // Initial fetch in case WS is delayed
-    fetch('/summary').then(r => r.json()).then(updateUI).catch(()=>{});
+        function updateCharts(data) {
+            // Update counters
+            if (data.status === 'PASS') {
+                buildCount.pass++;
+            } else {
+                buildCount.fail++;
+            }
+            buildNumber++;
+            totalDuration += data.duration_ms;
 
-    const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(wsProto + '://' + location.host + '/ws');
-    ws.onmessage = (ev) => {
-      try {
-        const msg = JSON.parse(ev.data);
-        if(msg.type === 'summary'){
-          updateUI(msg.data);
+            // Update stats
+            const total = buildCount.pass + buildCount.fail;
+            document.getElementById('total-builds').textContent = total;
+            document.getElementById('success-rate').textContent = 
+                `${((buildCount.pass / total) * 100).toFixed(1)}%`;
+            document.getElementById('avg-duration').textContent = 
+                `${Math.round(totalDuration / total)}ms`;
+
+            // Update status chart
+            statusChart.data.datasets[0].data = [buildCount.pass, buildCount.fail];
+            statusChart.update();
+
+            // Update duration chart
+            durationChart.data.labels.push(`Build ${buildNumber}`);
+            durationChart.data.datasets[0].data.push(data.duration_ms);
+            
+            // Keep only last 20 data points
+            if (durationChart.data.labels.length > 20) {
+                durationChart.data.labels.shift();
+                durationChart.data.datasets[0].data.shift();
+            }
+            durationChart.update();
         }
-      } catch(e){}
-    };
-  </script>
+
+        const flakyTests = new Set();
+
+        function addFlakyTest(data) {
+            if (!flakyTests.has(data.build_id)) {
+                flakyTests.add(data.build_id);
+                
+                const list = document.getElementById('flaky-tests-list');
+                if (flakyTests.size === 1) {
+                    list.innerHTML = '';
+                }
+                
+                const item = document.createElement('div');
+                item.className = 'flaky-test-item';
+                item.innerHTML = `
+                    <strong>${data.build_id}</strong><br>
+                    <small>Agent: ${data.agent_id} | Detected: ${new Date().toLocaleTimeString()}</small>
+                `;
+                list.insertBefore(item, list.firstChild);
+                
+                document.getElementById('flaky-count').textContent = flakyTests.size;
+            }
+        }
+
+        // Fetch initial summary
+        fetch('/summary')
+            .then(r => r.json())
+            .then(data => {
+                if (data.status_counts) {
+                    buildCount.pass = data.status_counts.PASS || 0;
+                    buildCount.fail = data.status_counts.FAIL || 0;
+                    const total = buildCount.pass + buildCount.fail;
+                    
+                    document.getElementById('total-builds').textContent = total;
+                    document.getElementById('success-rate').textContent = 
+                        `${((buildCount.pass / total) * 100).toFixed(1)}%`;
+                    document.getElementById('avg-duration').textContent = 
+                        `${Math.round(data.avg_duration_ms)}ms`;
+                    document.getElementById('flaky-count').textContent = data.flaky_count;
+                    
+                    statusChart.data.datasets[0].data = [buildCount.pass, buildCount.fail];
+                    statusChart.update();
+                }
+            });
+    </script>
 </body>
 </html>

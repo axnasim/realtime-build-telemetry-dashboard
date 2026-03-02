@@ -1,0 +1,8 @@
+# Claude Code settings (personal/local)
+.claude/
+
+# Virtual environments
+.venv-wsl/
+.venv/
+venv/
+env/
